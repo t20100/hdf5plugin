@@ -147,7 +147,7 @@ static size_t H5Z_filter_lz4(unsigned int flags, size_t cd_nelmts,
             blockSize = nbytes;
         }
         nBlocks = (nbytes-1)/blockSize +1;
-        if (NULL==(outBuf = malloc(LZ4_COMPRESSBOUND(nbytes)
+        if (NULL==(outBuf = malloc(nBlocks * LZ4_COMPRESSBOUND(blockSize)
                 + 4+8 + nBlocks*4)))
         {
             goto error;
@@ -174,7 +174,7 @@ static size_t H5Z_filter_lz4(unsigned int flags, size_t cd_nelmts,
                 blockSize = nbytes - origWritten;
 
 #if LZ4_VERSION_NUMBER > 10300
-            compBlockSize = LZ4_compress_default(rpos, roBuf+4,blockSize,nBlocks*4); /// reserve space for compBlockSize
+            compBlockSize = LZ4_compress_default(rpos, roBuf+4, blockSize, LZ4_COMPRESSBOUND(blockSize));
 #else
             compBlockSize = LZ4_compress(rpos, roBuf+4, blockSize); /// reserve space for compBlockSize
 #endif
