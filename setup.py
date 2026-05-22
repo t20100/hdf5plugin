@@ -1013,6 +1013,7 @@ def get_system_clib_names():
         raise RuntimeError(
             f"Unexpected names in HDF5PLUGIN_SYSTEM_LIBRARIES: {system_clibs - _CLIB_NAMES}"
         )
+    system_clibs.add("openjp2")  # TODO
     return system_clibs
 
 
@@ -1325,6 +1326,22 @@ def _get_lz4_plugin():
 PLUGIN_LIB_DEPENDENCIES["lz4"] = ("lz4",)
 
 
+def _get_jpeg2000_plugin():
+    """Jpeg2000 plugin build config"""
+    h5jpeg2000_dir = "lib/H5Z-jpeg2000"
+
+    return HDF5PluginExtension(
+        "hdf5plugin.plugins.libh5jpeg2000",
+        sources=glob(f"{h5jpeg2000_dir}/*.c"),
+        include_dirs=[h5jpeg2000_dir] + get_clib_config("openjp2", "include_dirs"),
+        extra_link_args=get_clib_config("openjp2", "extra_link_args"),
+        libraries=get_clib_config("openjp2", "libraries"),
+    )
+
+
+PLUGIN_LIB_DEPENDENCIES["jpeg200"] = ()
+
+
 def _get_bzip2_plugin():
     """BZip2 plugin build config"""
     return HDF5PluginExtension(
@@ -1493,6 +1510,7 @@ _EMBEDDED_PLUGIN_EXTENSIONS = {
     "bshuf": _get_bitshuffle_plugin,
     "bzip2": _get_bzip2_plugin,
     "fcidecomp": _get_fcidecomp_plugin,
+    "jpeg2000": _get_jpeg2000_plugin,
     "lz4": _get_lz4_plugin,
     "sperr": _get_sperr_plugin,
     "sz": _get_sz_plugin,

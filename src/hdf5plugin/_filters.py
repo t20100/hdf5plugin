@@ -536,6 +536,60 @@ class FciDecomp(FilterBase):
         return cls()
 
 
+class Jpeg2000(FilterBase):
+    """``h5py.Group.create_dataset``'s compression arguments for using Jpeg2000 filter.
+
+    .. code-block:: python
+
+        f = h5py.File('test.h5', 'w')
+        f.create_dataset(
+            'fcidecomp',
+            data=numpy.arange(100),
+            compression=hdf5plugin.Jpeg2000(compression_ratio=10.0))
+        f.close()
+
+    :param compression_ratio: Raw data/Compressed data size ratio.
+        Compression ratio of 1 means lossless compression
+    """
+
+    filter_name = "jpeg2000"
+    filter_id = 65000  # TODO
+
+    _FIXED_POINT_FACTOR = 100.0
+
+    def __init__(self, compression_ratio: float = 1.0):
+        compression_ratio = float(compression_ratio)
+        if compression_ratio < 1.0:
+            raise ValueError("compression ratio must be equal or higher than 1")
+
+        fixed_point_ratio = int(compression_ratio * self._FIXED_POINT_FACTOR)
+
+        super().__init__(
+            filter_options=(fixed_point_ratio,),
+            config={"compression_ratio": self._fixed_point_to_float(fixed_point_ratio)},
+        )
+
+    @property
+    def compression_ratio(self) -> float:
+        """Raw data/Compressed data size ratio"""
+        return self._fixed_point_to_float(self.filter_options[0])
+
+    @classmethod
+    def _fixed_point_to_float(cls, fixed_point_ratio: int) -> float:
+        return fixed_point_ratio / cls._FIXED_POINT_FACTOR
+
+    @classmethod
+    def _from_filter_options(cls, filter_options: tuple[int, ...]) -> Jpeg2000:
+        """Returns compression arguments from HDF5 compression filters "cd_values" options
+
+        :param filter_options: Expected format: (_, _, _, _, _, compression_ratio*)
+        :raises ValueError: Unsupported filter_options
+        """
+        if len(filter_options) <= 5:
+            return cls()
+        return cls(compression_ratio=cls._fixed_point_to_float(filter_options[5]))
+
+
 class LZ4(FilterBase):
     """``h5py.Group.create_dataset``'s compression arguments for using lz4 filter.
 
@@ -1309,6 +1363,7 @@ FILTER_CLASSES: tuple[type[FilterBase], ...] = (
     Blosc2,
     BZip2,
     FciDecomp,
+    Jpeg2000,
     LZ4,
     Sperr,
     SZ,
