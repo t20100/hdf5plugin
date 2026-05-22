@@ -25,7 +25,9 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import struct
+from pathlib import Path
 from collections.abc import Mapping
 from typing import Literal, TypeVar
 
@@ -549,13 +551,58 @@ class Jpeg2000(FilterBase):
         f.close()
 
     :param compression_ratio: Raw data/Compressed data size ratio.
-        Compression ratio of 1 means lossless compression
+        Compression ratio of 1 means lossless compression.
+
+    The native backend can be selected at runtime with
+    :meth:`Jpeg2000.configure_backend` or the
+    ``HDF5PLUGIN_JPEG2000_BACKEND`` environment variable. This setting is not
+    stored in the HDF5 file.
     """
 
     filter_name = "jpeg2000"
     filter_id = 65000  # TODO
 
     _FIXED_POINT_FACTOR = 100.0
+    _BACKEND_ENVVAR = "HDF5PLUGIN_JPEG2000_BACKEND"
+    _MANIFEST_ENVVAR = "HDF5PLUGIN_JPEG2000_MANIFEST"
+    _DEFAULT_MANIFEST_NAME = "hdf5plugin_jpeg2000_plugins.json"
+    _BackendType = Literal["auto", "openjpeg"]
+
+    @classmethod
+    def default_manifest_path(cls) -> str:
+        """Return the packaged jpeg2000 backend manifest path."""
+        return str(Path(__file__).with_name(cls._DEFAULT_MANIFEST_NAME))
+
+    @classmethod
+    def configure_manifest(cls, path: str | os.PathLike[str] | None = None) -> None:
+        """Select the runtime backend manifest used by the native filter.
+
+        Passing ``None`` restores the packaged manifest when it exists, otherwise
+        it clears the manifest environment override.
+        """
+        if path is None:
+            default_path = cls.default_manifest_path()
+            if os.path.exists(default_path):
+                os.environ[cls._MANIFEST_ENVVAR] = default_path
+            else:
+                os.environ.pop(cls._MANIFEST_ENVVAR, None)
+        else:
+            os.environ[cls._MANIFEST_ENVVAR] = os.fspath(path)
+
+    @classmethod
+    def configure_backend(cls, backend: Jpeg2000._BackendType = "auto") -> None:
+        """Select the runtime backend used by the native jpeg2000 filter.
+
+        This does not change the HDF5 file format. It only sets the backend
+        preference for the current process before HDF5 invokes the filter. The
+        explicit backend takes precedence over the manifest.
+        """
+        if backend not in ("auto", "openjpeg"):
+            raise ValueError(f"Unsupported jpeg2000 backend: {backend!r}")
+        if backend == "auto":
+            os.environ.pop(cls._BACKEND_ENVVAR, None)
+        else:
+            os.environ[cls._BACKEND_ENVVAR] = backend
 
     def __init__(self, compression_ratio: float = 1.0):
         compression_ratio = float(compression_ratio)
@@ -1375,3 +1422,12 @@ FILTER_CLASSES: tuple[type[FilterBase], ...] = (
 
 FILTERS: dict[str, int] = {cls.filter_name: cls.filter_id for cls in FILTER_CLASSES}
 """Mapping of provided filter's name to their HDF5 filter ID."""
+
+
+def _configure_default_jpeg2000_manifest() -> None:
+    manifest_path = Jpeg2000.default_manifest_path()
+    if os.path.exists(manifest_path):
+        os.environ.setdefault(Jpeg2000._MANIFEST_ENVVAR, manifest_path)
+
+
+_configure_default_jpeg2000_manifest()

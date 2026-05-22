@@ -59,6 +59,12 @@ dev = [
 packages = ["hdf5plugin"]
 package-dir = {"" = "src"}
 
+[tool.setuptools.package-data]
+# Ship backend manifests such as hdf5plugin_jpeg2000_plugins.json in wheels,
+# so runtime backend selection works after pip install, not only from source.
+# Keep py.typed packaged too; it marks hdf5plugin as typed for PEP 561 tools.
+hdf5plugin = ["*.json", "py.typed"]
+
 [tool.setuptools.dynamic]
 version = {attr = "hdf5plugin._version.version"}
 

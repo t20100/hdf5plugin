@@ -1332,14 +1332,17 @@ def _get_jpeg2000_plugin():
 
     return HDF5PluginExtension(
         "hdf5plugin.plugins.libh5jpeg2000",
-        sources=glob(f"{h5jpeg2000_dir}/*.c"),
+        sources=(
+            glob(f"{h5jpeg2000_dir}/*.c")
+            + glob(f"{h5jpeg2000_dir}/backends/*.c")
+        ),
         include_dirs=[h5jpeg2000_dir] + get_clib_config("openjp2", "include_dirs"),
         extra_link_args=get_clib_config("openjp2", "extra_link_args"),
         libraries=get_clib_config("openjp2", "libraries"),
     )
 
 
-PLUGIN_LIB_DEPENDENCIES["jpeg200"] = ()
+PLUGIN_LIB_DEPENDENCIES["jpeg2000"] = ()
 
 
 def _get_bzip2_plugin():

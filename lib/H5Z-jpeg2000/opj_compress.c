@@ -167,10 +167,10 @@ static void on_info(const char *msg, void *data) {
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-int compress(size_t input_nbytes, void *input_buffer, unsigned int width,
-             unsigned int height, unsigned int ncomps, unsigned int dtype,
-             float compression_ratio, size_t *output_nbytes,
-             void **output_buffer) {
+int h5z_jpeg2000_openjpeg_compress(
+    size_t input_nbytes, void *input_buffer, unsigned int width,
+    unsigned int height, unsigned int ncomps, unsigned int dtype,
+    float compression_ratio, size_t *output_nbytes, void **output_buffer) {
   int ret = -1;
   opj_codec_t *codec = NULL;
   opj_stream_t *stream = NULL;

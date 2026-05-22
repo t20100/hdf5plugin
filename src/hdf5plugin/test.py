@@ -66,6 +66,7 @@ compression_name_to_class = {
     "bzip2": hdf5plugin.BZip2,
     "lz4": hdf5plugin.LZ4,
     "fcidecomp": hdf5plugin.FciDecomp,
+    "jpeg2000": hdf5plugin.Jpeg2000,
     "sperr": hdf5plugin.Sperr,
     "sz": hdf5plugin.SZ,
     "sz3": hdf5plugin.SZ3,
@@ -917,6 +918,16 @@ class TestRegisterFilter(BaseTestHDF5PluginRW):
     def _simple_test(self, filter_name: str):
         if filter_name == "fcidecomp":
             self._test("fcidecomp", dtype=numpy.uint8)
+        elif filter_name == "jpeg2000":
+            original_natoms = self._data_natoms
+            original_shape = self._data_shape
+            try:
+                self._data_natoms = 64 * 96
+                self._data_shape = (64, 96)
+                self._test("jpeg2000", dtype=numpy.uint16)
+            finally:
+                self._data_natoms = original_natoms
+                self._data_shape = original_shape
         elif filter_name in ("sz", "zfp"):
             self._test(filter_name, dtype=numpy.float32, lossless=False)
         else:

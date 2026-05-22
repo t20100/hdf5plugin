@@ -171,8 +171,10 @@ static int pack_samples(const opj_image_t *image, const image_info_t *info,
 /* Public API                                                          */
 /* ------------------------------------------------------------------ */
 
-int decompress(size_t compressed_nbytes, void *compressed_buffer,
-               size_t *output_nbytes, void **output_buffer) {
+int h5z_jpeg2000_openjpeg_decompress(size_t compressed_nbytes,
+                                     void *compressed_buffer,
+                                     size_t *output_nbytes,
+                                     void **output_buffer) {
   int ret = -1;
   opj_codec_t *codec = NULL;
   opj_stream_t *stream = NULL;
@@ -186,7 +188,10 @@ int decompress(size_t compressed_nbytes, void *compressed_buffer,
   *output_nbytes = 0;
   *output_buffer = NULL;
 
-  /* ---- 1. Create J2K decoder (handles J2K, JP2 and HTJ2K) ---- */
+  /* ---- 1. Create J2K/JP2 decoder ----
+   * This plugin currently targets J2K only. HTJ2K support, if added,
+   * will be evaluated separately and possibly live in its own plugin.
+   */
   OPJ_CODEC_FORMAT format;
   if (compressed_nbytes < 4) {
     fprintf(stderr, "Input too short to determine codestream format\n");
