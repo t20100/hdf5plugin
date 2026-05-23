@@ -88,18 +88,31 @@ manifest can be selected with::
 Kakadu test procedure used in this development environment
 ----------------------------------------------------------
 
-The following commands assume the same environment used during development:
+The following commands mirror the quickstart style used in ``blosc2_j2k``:
+they create a fresh working directory and a fresh virtual environment under
+``/tmp``.  The project sources are fetched from the ``alemirone`` GitHub
+repository.  The only local, non-packaged dependency is the Kakadu installation
+already present in ``/data/scisofttmp/mirone/KD``.
 
-* source tree: ``/data/scisofttmp/mirone/PROJECTS/segmentation/NR/hdf5plugin_thomas``
-* test virtual environment: ``/data/scisofttmp/mirone/environments/hdf5plugin_jpeg2000_test``
+* repository: ``https://github.com/alemirone/hdf5plugin_thomas.git``
+* branch: ``jpeg2000``
+* temporary workdir and virtual environment: under ``/tmp``
 * Kakadu installation already present in: ``/data/scisofttmp/mirone/KD``
-* OpenJPEG pkg-config from the NightRail development environment
+* OpenJPEG discovered through pkg-config from the NightRail development stack
 
-Copy-paste build and install::
+Copy-paste full source quickstart::
 
-    cd /data/scisofttmp/mirone/PROJECTS/segmentation/NR/hdf5plugin_thomas
+    workdir="$(mktemp -d -p /tmp hdf5plugin_jpeg2000_kakadu_XXXXXXXX)"
+    cd "$workdir"
+    echo "Using quickstart directory: $PWD"
 
-    source /data/scisofttmp/mirone/environments/hdf5plugin_jpeg2000_test/bin/activate
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install --upgrade pip setuptools wheel
+    python -m pip install py-cpuinfo pkgconfig packaging numpy h5py
+
+    git clone --branch jpeg2000 https://github.com/alemirone/hdf5plugin_thomas.git
+    cd hdf5plugin_thomas
 
     export PKG_CONFIG_PATH=/cvmfs/tomo.esrf.fr/software/packages/ubuntu24.04/x86_64/nightraildev/26_06_01/lib/pkgconfig
     export KDIR=/data/scisofttmp/mirone/KD
@@ -109,13 +122,27 @@ Copy-paste build and install::
 
 Check that the main HDF5 filter does not link Kakadu directly::
 
-    ldd /data/scisofttmp/mirone/environments/hdf5plugin_jpeg2000_test/lib/python3.12/site-packages/hdf5plugin/plugins/libh5jpeg2000.so
+    JPEG2000_FILTER="$(python - <<'PY'
+    from pathlib import Path
+    import hdf5plugin
+    print(Path(hdf5plugin.__file__).resolve().parent / "plugins" / "libh5jpeg2000.so")
+    PY
+    )"
+
+    ldd "$JPEG2000_FILTER"
 
 The output should list OpenJPEG but not ``libkdu_*``.  The optional backend is
 separate and should show unresolved Kakadu libraries unless ``LD_LIBRARY_PATH``
 contains the Kakadu lib directory::
 
-    ldd /data/scisofttmp/mirone/environments/hdf5plugin_jpeg2000_test/lib/python3.12/site-packages/hdf5plugin/backends/jpeg2000/libh5jpeg2000_kakadu_backend.so
+    KAKADU_BACKEND="$(python - <<'PY'
+    from pathlib import Path
+    import hdf5plugin
+    print(Path(hdf5plugin.__file__).resolve().parent / "backends" / "jpeg2000" / "libh5jpeg2000_kakadu_backend.so")
+    PY
+    )"
+
+    ldd "$KAKADU_BACKEND"
 
 Run the normal hdf5plugin tests without Kakadu in ``LD_LIBRARY_PATH``.  This
 checks that the package remains usable and falls back to OpenJPEG::
