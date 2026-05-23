@@ -134,7 +134,48 @@ Check that the main HDF5 filter does not link any JPEG2000 backend directly::
 
 The output should not list OpenJPEG or ``libkdu_*``.  The optional Kakadu
 backend is separate and should show unresolved Kakadu libraries unless
-``LD_LIBRARY_PATH`` contains the Kakadu lib directory::
+``LD_LIBRARY_PATH`` contains the Kakadu lib directory.
+
+With the command sequence above, only the Kakadu backend is expected to be
+built on systems where OpenJPEG development files are not installed.  Seeing
+only this backend is therefore normal::
+
+    ls -l "$(python - <<'PY'
+    from pathlib import Path
+    import hdf5plugin
+    print(Path(hdf5plugin.__file__).resolve().parent / "backends" / "jpeg2000")
+    PY
+    )"
+
+The OpenJPEG backend is built only when pkg-config can find ``openjp2.pc`` at
+build time.  A system runtime library such as ``libopenjp2.so.7`` is not enough:
+the build also needs the OpenJPEG headers and pkg-config metadata.
+
+``PKG_CONFIG_PATH`` must point to the directory that contains ``openjp2.pc``,
+not to the file itself.  For example, if the file is::
+
+    /opt/openjpeg/lib/pkgconfig/openjp2.pc
+
+configure the environment as::
+
+    export PKG_CONFIG_PATH=/opt/openjpeg/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
+    pkg-config --modversion openjp2
+    python -m pip install --no-build-isolation --force-reinstall .
+
+On systems where OpenJPEG was installed in another prefix, first find the
+metadata file and use its parent directory::
+
+    find /usr /opt /data/scisofttmp/mirone -name openjp2.pc 2>/dev/null
+    export PKG_CONFIG_PATH=/directory/containing/openjp2.pc${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}
+    pkg-config --cflags --libs openjp2
+
+After that, the backend directory should contain both optional backends when
+Kakadu is also available::
+
+    hdf5plugin/backends/jpeg2000/libh5jpeg2000_kakadu_backend.so
+    hdf5plugin/backends/jpeg2000/libh5jpeg2000_openjpeg_backend.so
+
+The Kakadu backend check is::
 
     KAKADU_BACKEND="$(python - <<'PY'
     from pathlib import Path

@@ -184,8 +184,8 @@ static size_t filter_jpeg2000(unsigned int flags, size_t cd_nelmts,
   if (flags & H5Z_FLAG_REVERSE) { /** Decompress data **/
     /*
      * Enter the backend dispatcher.  This symbol is stable for the HDF5
-     * filter; runtime backend selection (manifest/env/fallback) happens
-     * inside h5z_jpeg2000_decompress().
+     * filter; runtime backend selection (explicit env var, manifest, or
+     * last-resort auto policy) happens inside h5z_jpeg2000_decompress().
      */
     result = h5z_jpeg2000_decompress(nbytes, input_buffer, &output_size, &output_buffer);
     if (result < 0) {
@@ -198,9 +198,10 @@ static size_t filter_jpeg2000(unsigned int flags, size_t cd_nelmts,
 
   } else { /** Compress data **/
     /*
-     * Same indirection for encoding: H5Zjpeg2000.c no longer calls OpenJPEG
-     * directly.  h5z_jpeg2000_compress() dispatches to the configured backend
-     * while keeping the HDF5 filter entry point independent from backend choice.
+     * Same indirection for encoding: H5Zjpeg2000.c no longer calls OpenJPEG or
+     * Kakadu directly.  h5z_jpeg2000_compress() dispatches to the configured
+     * backend while keeping the HDF5 filter entry point independent from
+     * backend choice and backend library availability.
      */
     result = h5z_jpeg2000_compress(nbytes, input_buffer, cd_values[CD_INDEX_WIDTH],
                       cd_values[CD_INDEX_HEIGHT], cd_values[CD_INDEX_NCOMPS],

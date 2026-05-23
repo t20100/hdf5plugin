@@ -17,6 +17,11 @@
 #define MAX_MANIFEST_BACKENDS 16
 #define MAX_BACKEND_NAME_LEN 64
 
+/*
+ * Keep this table for ABI symmetry with possible future built-in backends, but
+ * the current J2K filter intentionally ships no backend in libh5jpeg2000.so.
+ * OpenJPEG and Kakadu are both optional shared libraries loaded at runtime.
+ */
 static const h5z_jpeg2000_backend_t *const builtin_backends[] = {
     NULL,
 };
@@ -34,6 +39,16 @@ static int jpeg2000_debug_enabled(void) {
 }
 
 #ifndef _WIN32
+/*
+ * Backends installed by this package live next to the HDF5 plugin, under a
+ * plugin-specific directory:
+ *
+ *   hdf5plugin/plugins/libh5jpeg2000.so
+ *   hdf5plugin/backends/jpeg2000/libh5jpeg2000_<name>_backend.so
+ *
+ * This relative lookup keeps the Python package relocatable while avoiding any
+ * direct link from the HDF5 filter to backend-specific dependencies.
+ */
 static void make_backend_path(char *out, size_t out_size, const char *soname) {
   Dl_info info;
   out[0] = '\0';
@@ -94,6 +109,12 @@ static const h5z_jpeg2000_backend_t *load_dynamic_backend(const char *name) {
     }
   }
 
+  /*
+   * Candidate order:
+   * 1. explicit per-backend override, useful for local experiments;
+   * 2. packaged backend next to the plugin;
+   * 3. dynamic loader search path, useful for externally installed backends.
+   */
   const char *env_path = getenv(env_name);
   char relative_path[4096];
   char soname[128];
@@ -163,6 +184,12 @@ static const h5z_jpeg2000_backend_t *first_available_backend(void) {
     }
   }
 
+  /*
+   * Last-resort policy when neither env var nor manifest selects a backend.
+   * Prefer Kakadu when available in this development branch; OpenJPEG remains a
+   * fully dynamic fallback on machines where its development package was
+   * available at build time.
+   */
   const char *dynamic_defaults[] = {"kakadu", "openjpeg", NULL};
   for (int i = 0; dynamic_defaults[i] != NULL; i++) {
     const h5z_jpeg2000_backend_t *backend = load_dynamic_backend(dynamic_defaults[i]);
