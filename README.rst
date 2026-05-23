@@ -58,13 +58,16 @@ backend available in its own process.
 
 The current backend policy is:
 
-* ``openjpeg`` is the built-in fallback backend of ``libh5jpeg2000.so``.
-* ``kakadu`` is an optional backend library loaded with ``dlopen``.
+* ``libh5jpeg2000.so`` is backend-neutral and does not link OpenJPEG or Kakadu.
+* ``openjpeg`` is an optional backend library built only when OpenJPEG
+  development files are available through pkg-config.
+* ``kakadu`` is an optional backend library built when the Kakadu headers and
+  libraries are pointed to by ``KDIR``/``KAKADU_ROOT``.
 * Kakadu libraries are not bundled in the Python package or wheel.
-* If Kakadu is selected but its runtime libraries are not reachable through
-  ``LD_LIBRARY_PATH``, the backend is not used.
+* If a backend is selected but its runtime libraries are not reachable through
+  ``LD_LIBRARY_PATH``, that backend is not used.
 * In ``auto`` mode, the packaged manifest can prefer Kakadu and fall back to
-  OpenJPEG when Kakadu cannot be loaded.
+  OpenJPEG when both backends are available.
 
 Runtime backend selection can be done in Python::
 
@@ -98,7 +101,6 @@ already present in ``/data/scisofttmp/mirone/KD``.
 * branch: ``jpeg2000``
 * temporary workdir and virtual environment: under ``/tmp``
 * Kakadu installation already present in: ``/data/scisofttmp/mirone/KD``
-* OpenJPEG discovered through pkg-config from the NightRail development stack
 
 Copy-paste full source quickstart::
 
@@ -114,13 +116,12 @@ Copy-paste full source quickstart::
     git clone --branch jpeg2000 https://github.com/alemirone/hdf5plugin_thomas.git
     cd hdf5plugin_thomas
 
-    export PKG_CONFIG_PATH=/cvmfs/tomo.esrf.fr/software/packages/ubuntu24.04/x86_64/nightraildev/26_06_01/lib/pkgconfig
     export KDIR=/data/scisofttmp/mirone/KD
     export HDF5PLUGIN_STRIP=blosc,blosc2,bshuf,bzip2,fcidecomp,lz4,sperr,sz,sz3,zfp,zstd
 
     python -m pip install --no-build-isolation --force-reinstall .
 
-Check that the main HDF5 filter does not link Kakadu directly::
+Check that the main HDF5 filter does not link any JPEG2000 backend directly::
 
     JPEG2000_FILTER="$(python - <<'PY'
     from pathlib import Path
@@ -131,9 +132,9 @@ Check that the main HDF5 filter does not link Kakadu directly::
 
     ldd "$JPEG2000_FILTER"
 
-The output should list OpenJPEG but not ``libkdu_*``.  The optional backend is
-separate and should show unresolved Kakadu libraries unless ``LD_LIBRARY_PATH``
-contains the Kakadu lib directory::
+The output should not list OpenJPEG or ``libkdu_*``.  The optional Kakadu
+backend is separate and should show unresolved Kakadu libraries unless
+``LD_LIBRARY_PATH`` contains the Kakadu lib directory::
 
     KAKADU_BACKEND="$(python - <<'PY'
     from pathlib import Path
@@ -144,15 +145,9 @@ contains the Kakadu lib directory::
 
     ldd "$KAKADU_BACKEND"
 
-Run the normal hdf5plugin tests without Kakadu in ``LD_LIBRARY_PATH``.  This
-checks that the package remains usable and falls back to OpenJPEG::
-
-    export LD_LIBRARY_PATH=/cvmfs/tomo.esrf.fr/software/packages/ubuntu24.04/x86_64/nightraildev/26_06_01/lib
-    python -m unittest hdf5plugin.test
-
 Run an explicit Kakadu roundtrip by adding Kakadu to ``LD_LIBRARY_PATH``::
 
-    export LD_LIBRARY_PATH=/data/scisofttmp/mirone/KD/lib:/cvmfs/tomo.esrf.fr/software/packages/ubuntu24.04/x86_64/nightraildev/26_06_01/lib
+    export LD_LIBRARY_PATH=/data/scisofttmp/mirone/KD/lib
 
     python - <<'PY'
     import os
@@ -180,6 +175,10 @@ Run an explicit Kakadu roundtrip by adding Kakadu to ``LD_LIBRARY_PATH``::
     finally:
         os.unlink(path)
     PY
+
+Run the normal hdf5plugin tests in the same Kakadu-enabled environment::
+
+    python -m unittest hdf5plugin.test
 
 To debug backend selection, enable dispatcher diagnostics::
 

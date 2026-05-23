@@ -1359,6 +1359,19 @@ def _find_kakadu_library_name(library_dir, names):
     return None
 
 
+def _get_openjpeg_config():
+    """Return optional OpenJPEG build configuration for the JPEG2000 backend."""
+    try:
+        return {
+            "include_dirs": get_clib_config("openjp2", "include_dirs"),
+            "extra_link_args": get_clib_config("openjp2", "extra_link_args"),
+            "libraries": get_clib_config("openjp2", "libraries"),
+        }
+    except RuntimeError as exc:
+        logger.info("OpenJPEG JPEG2000 backend not built: %s", exc)
+        return None
+
+
 def _get_kakadu_config():
     """Return optional Kakadu build configuration for the JPEG2000 backend."""
     root = os.environ.get("KAKADU_ROOT") or os.environ.get("KDIR") or KAKADU_DEFAULT_ROOT
@@ -1396,6 +1409,22 @@ def _get_kakadu_config():
     }
 
 
+def _get_jpeg2000_openjpeg_backend(h5jpeg2000_dir, openjpeg_config):
+    """Optional OpenJPEG backend shared library loaded by the JPEG2000 filter."""
+    return Extension(
+        "hdf5plugin.backends.jpeg2000.libh5jpeg2000_openjpeg_backend",
+        sources=[
+            f"{h5jpeg2000_dir}/opj_compress.c",
+            f"{h5jpeg2000_dir}/opj_decompress.c",
+            f"{h5jpeg2000_dir}/backends/openjpeg.c",
+        ],
+        include_dirs=[h5jpeg2000_dir] + openjpeg_config["include_dirs"],
+        extra_link_args=openjpeg_config["extra_link_args"],
+        libraries=openjpeg_config["libraries"],
+        export_symbols=["h5z_jpeg2000_openjpeg_backend"],
+    )
+
+
 def _get_jpeg2000_kakadu_backend(h5jpeg2000_dir, kakadu_config):
     """Optional Kakadu backend shared library loaded by the JPEG2000 filter."""
     return Extension(
@@ -1417,12 +1446,18 @@ def _get_jpeg2000_plugin():
     extensions = [
         HDF5PluginExtension(
             "hdf5plugin.plugins.libh5jpeg2000",
-            sources=glob(f"{h5jpeg2000_dir}/*.c") + glob(f"{h5jpeg2000_dir}/backends/*.c"),
-            include_dirs=[h5jpeg2000_dir] + get_clib_config("openjp2", "include_dirs"),
-            extra_link_args=get_clib_config("openjp2", "extra_link_args"),
-            libraries=get_clib_config("openjp2", "libraries"),
+            sources=[
+                f"{h5jpeg2000_dir}/H5Zjpeg2000.c",
+                f"{h5jpeg2000_dir}/backends/registry.c",
+            ],
+            include_dirs=[h5jpeg2000_dir],
+            extra_link_args=["-ldl"] if sys.platform != "win32" else [],
         )
     ]
+
+    openjpeg_config = _get_openjpeg_config()
+    if openjpeg_config is not None:
+        extensions.append(_get_jpeg2000_openjpeg_backend(h5jpeg2000_dir, openjpeg_config))
 
     kakadu_config = _get_kakadu_config()
     if kakadu_config is not None:

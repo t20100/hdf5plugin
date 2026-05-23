@@ -30,10 +30,10 @@ typedef enum {
 } h5z_j2k_dtype_t;
 
 /*
- * Backend ABI for the standalone J2K filter.  OpenJPEG remains built into
- * the HDF5 filter itself, while optional commercial/open-source backends can
- * live in separate shared libraries.  This keeps the HDF5 filter loadable even
- * when optional backend dependencies such as Kakadu are not on LD_LIBRARY_PATH.
+ * Backend ABI for the standalone J2K filter.  The HDF5 filter itself stays
+ * backend-neutral; OpenJPEG, Kakadu and future engines live in separate shared
+ * libraries loaded by the dispatcher.  This keeps the HDF5 filter loadable even
+ * when optional backend dependencies are not on LD_LIBRARY_PATH.
  *
  * HTJ2K is intentionally planned as a separate HDF5 plugin rather
  * than another mode of this J2K filter.  That future plugin can use
