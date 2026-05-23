@@ -1,6 +1,6 @@
 {
   "version": 1,
   "priority": {
-    "jpeg2000": ["openjpeg"]
+    "jpeg2000": ["kakadu", "openjpeg"]
   }
 }

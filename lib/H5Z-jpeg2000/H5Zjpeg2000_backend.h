@@ -3,6 +3,10 @@
 
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define H5Z_JPEG2000_BACKEND_ENV "HDF5PLUGIN_JPEG2000_BACKEND"
 #define H5Z_JPEG2000_MANIFEST_ENV "HDF5PLUGIN_JPEG2000_MANIFEST"
 #define H5Z_JPEG2000_MANIFEST_NAME "hdf5plugin_jpeg2000_plugins.json"
@@ -26,10 +30,10 @@ typedef enum {
 } h5z_j2k_dtype_t;
 
 /*
- * Backend ABI for the standalone J2K filter.  OpenJPEG is the only
- * backend wired today, but this indirection is meant to let us add
- * alternatives such as Kakadu or Grok without changing the HDF5
- * filter entry point or the file format.
+ * Backend ABI for the standalone J2K filter.  OpenJPEG remains built into
+ * the HDF5 filter itself, while optional commercial/open-source backends can
+ * live in separate shared libraries.  This keeps the HDF5 filter loadable even
+ * when optional backend dependencies such as Kakadu are not on LD_LIBRARY_PATH.
  *
  * HTJ2K is intentionally planned as a separate HDF5 plugin rather
  * than another mode of this J2K filter.  That future plugin can use
@@ -94,5 +98,22 @@ int h5z_jpeg2000_openjpeg_decompress(size_t compressed_nbytes,
                                      void **output_buffer);
 
 extern const h5z_jpeg2000_backend_t h5z_jpeg2000_openjpeg_backend;
+
+#ifdef H5Z_JPEG2000_HAVE_KAKADU
+int h5z_jpeg2000_kakadu_compress(
+    size_t input_nbytes, void *input_buffer, unsigned int width,
+    unsigned int height, unsigned int ncomps, unsigned int dtype,
+    float compression_ratio, size_t *output_nbytes, void **output_buffer);
+int h5z_jpeg2000_kakadu_decompress(size_t compressed_nbytes,
+                                   void *compressed_buffer,
+                                   size_t *output_nbytes,
+                                   void **output_buffer);
+
+extern const h5z_jpeg2000_backend_t h5z_jpeg2000_kakadu_backend;
+#endif
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

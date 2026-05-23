@@ -1,13 +1,23 @@
+#ifndef _WIN32
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#endif
+
 #include "H5Zjpeg2000_backend.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#ifndef _WIN32
+#include <dlfcn.h>
+#endif
+
 #define MAX_MANIFEST_BACKENDS 16
 #define MAX_BACKEND_NAME_LEN 64
 
-static const h5z_jpeg2000_backend_t *const available_backends[] = {
+static const h5z_jpeg2000_backend_t *const builtin_backends[] = {
     &h5z_jpeg2000_openjpeg_backend,
     NULL,
 };
@@ -18,19 +28,102 @@ typedef struct {
   char error[256];
 } manifest_priority_t;
 
+
+static int jpeg2000_debug_enabled(void) {
+  const char *debug = getenv("HDF5PLUGIN_JPEG2000_DEBUG");
+  return debug != NULL && debug[0] != '\0';
+}
+
+#ifndef _WIN32
+static void make_backend_path(char *out, size_t out_size) {
+  Dl_info info;
+  out[0] = '\0';
+  if (dladdr((void *)&h5z_jpeg2000_select_backend, &info) == 0 ||
+      info.dli_fname == NULL) {
+    return;
+  }
+
+  char plugin_path[4096];
+  snprintf(plugin_path, sizeof(plugin_path), "%s", info.dli_fname);
+  char *slash = strrchr(plugin_path, '/');
+  if (slash == NULL) {
+    return;
+  }
+  *slash = '\0';
+  snprintf(out, out_size, "%s/../backends/jpeg2000/libh5jpeg2000_kakadu_backend.so",
+           plugin_path);
+}
+#endif
+
+static const h5z_jpeg2000_backend_t *load_kakadu_backend(void) {
+#ifndef _WIN32
+  static int tried = 0;
+  static const h5z_jpeg2000_backend_t *backend = NULL;
+  static void *handle = NULL;
+  if (tried) {
+    return backend;
+  }
+  tried = 1;
+
+  const char *env_path = getenv("HDF5PLUGIN_JPEG2000_KAKADU_BACKEND_PATH");
+  char relative_path[4096];
+  make_backend_path(relative_path, sizeof(relative_path));
+
+  const char *candidates[4];
+  int candidate_count = 0;
+  if (env_path != NULL && env_path[0] != '\0') {
+    candidates[candidate_count++] = env_path;
+  }
+  if (relative_path[0] != '\0') {
+    candidates[candidate_count++] = relative_path;
+  }
+  candidates[candidate_count++] = "libh5jpeg2000_kakadu_backend.so";
+  candidates[candidate_count] = NULL;
+
+  for (int i = 0; candidates[i] != NULL; i++) {
+    handle = dlopen(candidates[i], RTLD_NOW | RTLD_LOCAL);
+    if (handle == NULL) {
+      if (jpeg2000_debug_enabled()) {
+        fprintf(stderr, "jpeg2000: could not load Kakadu backend '%s': %s\n",
+                candidates[i], dlerror());
+      }
+      continue;
+    }
+    backend = (const h5z_jpeg2000_backend_t *)dlsym(
+        handle, "h5z_jpeg2000_kakadu_backend");
+    if (backend != NULL && backend->name != NULL &&
+        strcmp(backend->name, "kakadu") == 0) {
+      return backend;
+    }
+    if (jpeg2000_debug_enabled()) {
+      fprintf(stderr, "jpeg2000: invalid Kakadu backend '%s'\n", candidates[i]);
+    }
+    dlclose(handle);
+    handle = NULL;
+    backend = NULL;
+  }
+#else
+  (void)jpeg2000_debug_enabled;
+#endif
+  return NULL;
+}
+
 static const h5z_jpeg2000_backend_t *find_backend(const char *name) {
-  for (int i = 0; available_backends[i] != NULL; i++) {
-    const h5z_jpeg2000_backend_t *backend = available_backends[i];
+  for (int i = 0; builtin_backends[i] != NULL; i++) {
+    const h5z_jpeg2000_backend_t *backend = builtin_backends[i];
     if (strcmp(name, backend->name) == 0) {
       return backend;
     }
+  }
+  if (strcmp(name, "kakadu") == 0) {
+    return load_kakadu_backend();
   }
   return NULL;
 }
 
 static const h5z_jpeg2000_backend_t *first_available_backend(void) {
-  for (int i = 0; available_backends[i] != NULL; i++) {
-    const h5z_jpeg2000_backend_t *backend = available_backends[i];
+  for (int i = 0; builtin_backends[i] != NULL; i++) {
+    const h5z_jpeg2000_backend_t *backend = builtin_backends[i];
     if (backend->available()) {
       return backend;
     }

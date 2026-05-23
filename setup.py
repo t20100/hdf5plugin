@@ -1326,20 +1326,108 @@ def _get_lz4_plugin():
 PLUGIN_LIB_DEPENDENCIES["lz4"] = ("lz4",)
 
 
+KAKADU_DEFAULT_ROOT = "/data/scisofttmp/mirone/KD"
+
+
+def _find_kakadu_include_dir(root):
+    """Return a Kakadu include directory, or None when Kakadu is unavailable."""
+    candidates = [os.environ.get("KAKADU_INCLUDE_DIR")]
+    if root:
+        candidates.extend(
+            [
+                os.path.join(root, "managed", "all_includes"),
+                os.path.join(root, "all_includes"),
+                os.path.join(root, "include"),
+                root,
+            ]
+        )
+    for candidate in candidates:
+        if candidate and os.path.exists(os.path.join(candidate, "kdu_stripe_compressor.h")):
+            return candidate
+    return None
+
+
+def _find_kakadu_library_name(library_dir, names):
+    """Return the linker name for the first Kakadu library found."""
+    suffixes = (".so", ".dylib", ".a")
+    for name in names:
+        for suffix in suffixes:
+            if os.path.exists(os.path.join(library_dir, f"lib{name}{suffix}")):
+                return name
+        if sys.platform == "win32" and os.path.exists(os.path.join(library_dir, f"{name}.lib")):
+            return name
+    return None
+
+
+def _get_kakadu_config():
+    """Return optional Kakadu build configuration for the JPEG2000 backend."""
+    root = os.environ.get("KAKADU_ROOT") or os.environ.get("KDIR") or KAKADU_DEFAULT_ROOT
+    library_dir = (
+        os.environ.get("KAKADU_LIBRARY_DIR")
+        or os.environ.get("KAKADU_LIB_PATH")
+        or (os.path.join(root, "lib") if root else None)
+    )
+    include_dir = _find_kakadu_include_dir(root)
+
+    if not include_dir or not library_dir or not os.path.isdir(library_dir):
+        logger.info("Kakadu JPEG2000 backend not built: headers/libraries not found")
+        return None
+
+    core = _find_kakadu_library_name(
+        library_dir,
+        ("kdu_v86R", "kdu_v85R", "kdu_v84R", "kdu_v83R", "kdu_v82R", "kdu_v81R", "kdu_v80R", "kdu"),
+    )
+    aux = _find_kakadu_library_name(
+        library_dir,
+        ("kdu_a86R", "kdu_a85R", "kdu_a84R", "kdu_a83R", "kdu_a82R", "kdu_a81R", "kdu_a80R", "kdu_aux"),
+    )
+    if not core or not aux:
+        logger.info("Kakadu JPEG2000 backend not built: kdu/kdu_aux libraries not found")
+        return None
+
+    extra_link_args = ["-lstdc++"] if sys.platform != "win32" else []
+
+    logger.info("Building Kakadu JPEG2000 backend from %s", root)
+    return {
+        "include_dir": include_dir,
+        "library_dir": library_dir,
+        "libraries": [core, aux],
+        "extra_link_args": extra_link_args,
+    }
+
+
+def _get_jpeg2000_kakadu_backend(h5jpeg2000_dir, kakadu_config):
+    """Optional Kakadu backend shared library loaded by the JPEG2000 filter."""
+    return Extension(
+        "hdf5plugin.backends.jpeg2000.libh5jpeg2000_kakadu_backend",
+        sources=[f"{h5jpeg2000_dir}/backends/kakadu.cpp"],
+        include_dirs=[h5jpeg2000_dir, kakadu_config["include_dir"]],
+        define_macros=[("H5Z_JPEG2000_HAVE_KAKADU", 1)],
+        extra_compile_args=["-std=c++11"],
+        extra_link_args=kakadu_config["extra_link_args"],
+        libraries=kakadu_config["libraries"],
+        library_dirs=[kakadu_config["library_dir"]],
+        export_symbols=["h5z_jpeg2000_kakadu_backend"],
+    )
+
+
 def _get_jpeg2000_plugin():
     """Jpeg2000 plugin build config"""
     h5jpeg2000_dir = "lib/H5Z-jpeg2000"
+    extensions = [
+        HDF5PluginExtension(
+            "hdf5plugin.plugins.libh5jpeg2000",
+            sources=glob(f"{h5jpeg2000_dir}/*.c") + glob(f"{h5jpeg2000_dir}/backends/*.c"),
+            include_dirs=[h5jpeg2000_dir] + get_clib_config("openjp2", "include_dirs"),
+            extra_link_args=get_clib_config("openjp2", "extra_link_args"),
+            libraries=get_clib_config("openjp2", "libraries"),
+        )
+    ]
 
-    return HDF5PluginExtension(
-        "hdf5plugin.plugins.libh5jpeg2000",
-        sources=(
-            glob(f"{h5jpeg2000_dir}/*.c")
-            + glob(f"{h5jpeg2000_dir}/backends/*.c")
-        ),
-        include_dirs=[h5jpeg2000_dir] + get_clib_config("openjp2", "include_dirs"),
-        extra_link_args=get_clib_config("openjp2", "extra_link_args"),
-        libraries=get_clib_config("openjp2", "libraries"),
-    )
+    kakadu_config = _get_kakadu_config()
+    if kakadu_config is not None:
+        extensions.append(_get_jpeg2000_kakadu_backend(h5jpeg2000_dir, kakadu_config))
+    return extensions
 
 
 PLUGIN_LIB_DEPENDENCIES["jpeg2000"] = ()
@@ -1561,11 +1649,16 @@ def get_libraries_and_extensions():
         if name not in get_system_clib_names()
     ]
 
-    # Create Python extensions
+    # Create Python extensions.  Some filter factories can return more than one
+    # extension, e.g. the JPEG2000 HDF5 filter plus optional backend libraries.
     embedded_extension_names = PLUGIN_NAMES - stripped_filters
-    extensions = [
-        _EMBEDDED_PLUGIN_EXTENSIONS[name]() for name in embedded_extension_names
-    ]
+    extensions = []
+    for name in embedded_extension_names:
+        extension_or_extensions = _EMBEDDED_PLUGIN_EXTENSIONS[name]()
+        if isinstance(extension_or_extensions, (list, tuple)):
+            extensions.extend(extension_or_extensions)
+        else:
+            extensions.append(extension_or_extensions)
 
     if extensions and sys.platform != "win32":
         # Add hdf5 dynamic loading lib

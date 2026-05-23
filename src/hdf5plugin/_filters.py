@@ -566,7 +566,7 @@ class Jpeg2000(FilterBase):
     _BACKEND_ENVVAR = "HDF5PLUGIN_JPEG2000_BACKEND"
     _MANIFEST_ENVVAR = "HDF5PLUGIN_JPEG2000_MANIFEST"
     _DEFAULT_MANIFEST_NAME = "hdf5plugin_jpeg2000_plugins.json"
-    _BackendType = Literal["auto", "openjpeg"]
+    _BackendType = Literal["auto", "openjpeg", "kakadu"]
 
     @classmethod
     def default_manifest_path(cls) -> str:
@@ -597,7 +597,7 @@ class Jpeg2000(FilterBase):
         preference for the current process before HDF5 invokes the filter. The
         explicit backend takes precedence over the manifest.
         """
-        if backend not in ("auto", "openjpeg"):
+        if backend not in ("auto", "openjpeg", "kakadu"):
             raise ValueError(f"Unsupported jpeg2000 backend: {backend!r}")
         if backend == "auto":
             os.environ.pop(cls._BACKEND_ENVVAR, None)
