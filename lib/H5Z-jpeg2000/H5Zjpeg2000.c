@@ -37,7 +37,7 @@ or
 #include <string.h>
 #include <sys/types.h>
 
-#define H5Z_FILTER_JPEG2000 65000
+#define H5Z_FILTER_JPEG2000 32031
 #define H5Z_FILTER_JPEG2000_VERSION 1
 
 #define CD_INDEX_VERSION 0
@@ -182,7 +182,7 @@ static size_t filter_jpeg2000(unsigned int flags, size_t cd_nelmts,
   void *input_buffer = *buf;
 
   if (flags & H5Z_FLAG_REVERSE) { /** Decompress data **/
-    result = decompress(nbytes, input_buffer, &output_size, &output_buffer);
+    result = h5z_jpeg2000_decompress(nbytes, input_buffer, &output_size, &output_buffer);
     if (result < 0) {
       fprintf(stderr, "decompress failed\n");
       if (output_buffer) {
@@ -192,7 +192,7 @@ static size_t filter_jpeg2000(unsigned int flags, size_t cd_nelmts,
     }
 
   } else { /** Compress data **/
-    result = compress(nbytes, input_buffer, cd_values[CD_INDEX_WIDTH],
+    result = h5z_jpeg2000_compress(nbytes, input_buffer, cd_values[CD_INDEX_WIDTH],
                       cd_values[CD_INDEX_HEIGHT], cd_values[CD_INDEX_NCOMPS],
                       cd_values[CD_INDEX_DTYPE],
                       cd_values[CD_INDEX_RATIO] /

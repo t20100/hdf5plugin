@@ -11,7 +11,7 @@ typedef enum {
 } h5z_j2k_dtype_t;
 
 /**
- * compress() – encode a raw pixel buffer to a J2K codestream in memory.
+ * h5z_jpeg2000_compress() – encode a raw pixel buffer to a J2K codestream in memory.
  *
  * @param input_nbytes       byte length of the input pixel buffer
  * @param input_buffer       pointer to the input pixel buffer (interleaved
@@ -26,13 +26,13 @@ typedef enum {
  * @param output_buffer      [out] caller-owned output buffer (free() when done)
  * @return 0 on success, -1 on failure
  */
-int compress(size_t compressed_nbytes, void *compressed_buffer,
+int h5z_jpeg2000_compress(size_t compressed_nbytes, void *compressed_buffer,
              unsigned int width, unsigned int height, unsigned int ncomps,
              unsigned int dtype, float compression_ratio, size_t *output_nbytes,
              void **output_buffer);
 
 /**
- * decompress() – decode a raw J2K / HTJ2K codestream from memory.
+ * h5z_jpeg2000_decompress() – decode a raw J2K / HTJ2K codestream from memory.
  *
  * @param compressed_nbytes  byte length of the input codestream
  * @param compressed_buffer  pointer to the input codestream
@@ -40,5 +40,5 @@ int compress(size_t compressed_nbytes, void *compressed_buffer,
  * @param output_buffer      [out] caller-owned output buffer (free() when done)
  * @return 0 on success, -1 on failure
  */
-int decompress(size_t compressed_nbytes, void *compressed_buffer,
+int h5z_jpeg2000_decompress(size_t compressed_nbytes, void *compressed_buffer,
                size_t *output_nbytes, void **output_buffer);
